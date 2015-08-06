@@ -6342,4 +6342,41 @@ function etypeByPageno ($pg = NULL)
 	return $etype_by_pageno[$pg];
 }
 
+function checkDomainConsistency($object_id, $vswitch = NULL) {
+	$upstreams = $conflicts = array();
+	$object = spotEntity('object', $object_id);
+        amplifyCell($object);
+	if(NULL == $object['8021q_domain_id']){
+		return array();
+	}
+	$vlandomain = getVLANDomain ($object['8021q_domain_id']);
+	$vswitch = getVLANSwitchInfo ($object_id);
+	$desired_config = apply8021QOrder ($vswitch, getStored8021QConfig ($object_id));
+	$uplinks = produceUplinkPorts ($vlandomain['vlanlist'], $desired_config, $vswitch['object_id']);
+
+	foreach (array_keys($uplinks) as $uplink)
+	{
+		foreach (array_values($object['ports']) as $port)
+		{
+			if (strcmp($uplink,$port['name']) != 0) {
+				continue;
+			}
+			$upstream_object = spotEntity('object',$port['remote_object_id']);
+
+			if ($upstream_object['8021q_domain_id'] !== $object['8021q_domain_id']) {
+				$conflicts[$object_id] = array (
+					'port_id' => $port['id'],
+					'port_name' => $port['name'],
+					'upstream_id' => $port['remote_object_id'],
+					'upstream_name' => $port['remote_object_name'],
+					'upstream_domain_id' => $upstream_object['8021q_domain_id']
+				);
+			}
+		}
+	}
+	return $conflicts;
+}
+
+
+
 ?>
